@@ -5,6 +5,9 @@ library(randomForest)
 library(ggplot2)
 library(DT)
 
+# Charger les variables d'environnement (GROQ_API_KEY, etc.)
+if (file.exists(".Renviron")) readRenviron(".Renviron")
+
 # ── Sources modulaires ────────────────────────────────────────────────────────
 source("R/tab1.R")
 source("R/tab2_prediction.R")
