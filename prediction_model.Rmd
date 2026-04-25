@@ -1,0 +1,261 @@
+---
+title: "Prédiction des réponses aux médicaments — Cancer du sein"
+subtitle: "Machine Learning sur scores d'influence des facteurs de transcription"
+author: "Groupe Bioinformatique"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: flatly
+    highlight: tango
+    code_folding: show
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+```
+
+# 1. Chargement des données
+
+```{r libraries}
+library(tidyverse)
+library(randomForest)
+library(ggplot2)
+library(pheatmap)
+library(knitr)
+library(kableExtra)
+
+DATA_DIR <- "/Users/edenbete/Downloads/Bioinf groupe/"
+```
+
+```{r load-data}
+# Scores d'influence TF — lignes = TF, colonnes = lignées cellulaires
+influence_raw <- read.csv(
+  paste0(DATA_DIR, "influence_uploadedData.csv"),
+  row.names = 1, check.names = FALSE
+)
+
+# Classification des lignées en sous-types
+classif <- read.csv(
+  paste0(DATA_DIR, "classification_uploadedData.csv"),
+  row.names = 1, check.names = FALSE
+)
+
+# Réponses aux médicaments (PRISM) — lignes = lignées, colonnes = drogues
+prism <- read.csv(
+  paste0(DATA_DIR, "PRISM Repurposing Secondary Subsetted.csv"),
+  row.names = 1, check.names = FALSE
+)
+
+# Transposer l'influence : on veut lignes = lignées, colonnes = TF
+influence <- as.data.frame(t(influence_raw))
+
+cat("Influence :", nrow(influence), "lignées ×", ncol(influence), "TF\n")
+cat("PRISM     :", nrow(prism), "lignées ×", ncol(prism), "drogues\n")
+cat("Classification :", nrow(classif), "lignées\n")
+```
+
+# 2. Préparation — lignées communes
+
+```{r common-cells}
+# Étape 1 : les lignées classifiées sont notre référence (70 lignées du bon cancer)
+classified_cells <- rownames(classif)
+cat("Lignées classifiées :", length(classified_cells), "\n")
+
+# Étape 2 : parmi ces 70, on garde celles qui ont aussi des données PRISM
+# (PRISM contient ~727 lignées de TOUS les cancers — on filtre sur nos 70)
+common_cells <- intersect(classified_cells, rownames(prism))
+cat("Lignées communes (classifiées ∩ PRISM) :", length(common_cells), "\n")
+cat("Lignées classifiées sans données PRISM :", length(classified_cells) - length(common_cells), "\n")
+
+# Matrices features (X) et cibles (Y)
+X <- influence[common_cells, ]         # 30 × 507
+Y <- prism[common_cells, ]             # 30 × 1482
+
+# Sous-types pour les lignées communes
+subtypes <- classif[common_cells, "cluster"]
+names(subtypes) <- common_cells
+
+table(subtypes) %>%
+  kable(caption = "Distribution des sous-types (30 lignées communes)") %>%
+  kable_styling(bootstrap_options = "striped", full_width = FALSE)
+```
+
+# 3. Sélection des drogues d'intérêt
+
+```{r filter-drugs}
+# Garder les drogues avec < 30% de valeurs manquantes
+na_prop  <- colMeans(is.na(Y))
+drug_var <- apply(Y, 2, var, na.rm = TRUE)
+
+Y_filtered <- Y[, na_prop < 0.3 & !is.na(drug_var) & drug_var > 0.005]
+cat("Drogues retenues après filtrage :", ncol(Y_filtered), "\n")
+
+# Top 30 drogues les plus variables entre lignées
+drug_var_filt <- apply(Y_filtered, 2, var, na.rm = TRUE)
+top_drugs     <- names(sort(drug_var_filt, decreasing = TRUE))[1:30]
+
+cat("Top 30 drogues sélectionnées pour le ML :\n")
+cat(paste(top_drugs[1:10], collapse = ", "), "...\n")
+```
+
+# 4. Machine Learning — Random Forest par drogue
+
+**Principe :** Pour chaque drogue, on entraîne un modèle Random Forest :
+- **Features** : 507 scores TF de la lignée
+- **Cible** : AUC de la drogue dans cette lignée (plus l'AUC est bas, plus la drogue est efficace)
+- **Évaluation** : Leave-One-Out Cross-Validation (LOO-CV) — adapté aux petits échantillons (n=30)
+
+```{r train-rf, cache=TRUE}
+# Fonction : entraîner RF + LOO-CV pour une drogue
+train_rf_drug <- function(drug_name, X, Y) {
+  y            <- Y[, drug_name]
+  complete_idx <- which(!is.na(y))
+  if (length(complete_idx) < 8) return(NULL)
+
+  X_drug <- X[complete_idx, ]
+  y_drug <- y[complete_idx]
+  n      <- length(complete_idx)
+
+  # LOO-CV
+  preds_loo <- numeric(n)
+  for (i in seq_len(n)) {
+    rf_i        <- randomForest(x = X_drug[-i, ], y = y_drug[-i],
+                                ntree = 200, importance = FALSE)
+    preds_loo[i] <- predict(rf_i, X_drug[i, , drop = FALSE])
+  }
+
+  # Modèle final sur toutes les données (pour importance + prédiction)
+  rf_full <- randomForest(x = X_drug, y = y_drug,
+                          ntree = 500, importance = TRUE)
+
+  list(
+    drug       = drug_name,
+    cor_loo    = cor(preds_loo, y_drug),
+    rmse_loo   = sqrt(mean((preds_loo - y_drug)^2)),
+    model      = rf_full,
+    importance = importance(rf_full)[, "%IncMSE"],
+    n_cells    = n
+  )
+}
+
+# Entraînement sur le top 30 drogues
+set.seed(42)
+results <- lapply(top_drugs, function(d) {
+  train_rf_drug(d, X, Y_filtered)
+})
+names(results) <- top_drugs
+results        <- Filter(Negate(is.null), results)
+
+cat("Modèles entraînés avec succès :", length(results), "\n")
+```
+
+# 5. Évaluation des modèles
+
+```{r eval-models}
+perf_df <- data.frame(
+  Drug    = names(results),
+  Cor_LOO = sapply(results, `[[`, "cor_loo"),
+  RMSE    = sapply(results, `[[`, "rmse_loo"),
+  N_cells = sapply(results, `[[`, "n_cells")
+) %>%
+  arrange(desc(Cor_LOO))
+
+perf_df %>%
+  head(15) %>%
+  kable(digits = 3,
+        caption = "Performance LOO-CV des modèles RF (top 15 drogues)") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+```
+
+```{r plot-performance}
+ggplot(perf_df, aes(x = reorder(Drug, Cor_LOO), y = Cor_LOO,
+                    fill = Cor_LOO > 0.5)) +
+  geom_col() +
+  coord_flip() +
+  scale_fill_manual(values = c("#B0C4DE", "#2C3E50")) +
+  labs(title    = "Corrélation LOO-CV par drogue",
+       subtitle = "Plus la corrélation est haute, mieux le modèle prédit",
+       x = NULL, y = "Corrélation (prédite vs réelle)",
+       fill = "Cor > 0.5") +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+```
+
+# 6. TF les plus prédictifs
+
+```{r top-tfs}
+# Agréger l'importance TF sur toutes les drogues bien prédites
+good_models <- results[perf_df$Drug[perf_df$Cor_LOO > 0.4]]
+
+if (length(good_models) > 0) {
+  imp_matrix <- do.call(cbind, lapply(good_models, `[[`, "importance"))
+  imp_mean   <- rowMeans(imp_matrix, na.rm = TRUE)
+  top_tfs    <- sort(imp_mean, decreasing = TRUE)[1:20]
+
+  data.frame(TF = names(top_tfs), Importance = top_tfs) %>%
+    ggplot(aes(x = reorder(TF, Importance), y = Importance)) +
+    geom_col(fill = "#2C3E50") +
+    coord_flip() +
+    labs(title    = "Top 20 TF les plus prédictifs",
+         subtitle = "Importance moyenne (%IncMSE) sur les modèles avec Cor > 0.4",
+         x = NULL, y = "Importance (%IncMSE)") +
+    theme_minimal()
+} else {
+  cat("Aucun modèle avec corrélation > 0.4\n")
+}
+```
+
+# 7. Fonction de prédiction pour un nouveau profil
+
+```{r predict-function}
+# Cette fonction sera utilisée dans l'application Shiny
+predict_best_drugs <- function(tf_scores_new, models, top_n = 10) {
+  # tf_scores_new : vecteur nommé de 507 scores TF
+  tf_df <- as.data.frame(t(tf_scores_new))
+
+  preds <- sapply(models, function(res) {
+    m          <- res$model
+    tfs_needed <- rownames(m$importance)
+    # Aligner les TF disponibles
+    tfs_ok     <- intersect(tfs_needed, colnames(tf_df))
+    if (length(tfs_ok) < 10) return(NA)
+    predict(m, tf_df[, tfs_ok, drop = FALSE])
+  })
+
+  preds <- preds[!is.na(preds)]
+
+  data.frame(
+    Drug          = names(sort(preds)[1:min(top_n, length(preds))]),
+    AUC_predicted = round(sort(preds)[1:min(top_n, length(preds))], 4)
+  )
+}
+```
+
+# 8. Exemple de prédiction — simulation nouveau patient
+
+```{r demo-prediction}
+# Simuler un nouveau profil TF (moyenne des profils connus + bruit)
+set.seed(123)
+new_tf_profile       <- colMeans(X) + rnorm(ncol(X), 0, 0.1)
+names(new_tf_profile) <- colnames(X)
+
+top_predicted <- predict_best_drugs(new_tf_profile, results, top_n = 10)
+
+top_predicted %>%
+  kable(caption = "Top 10 médicaments prédits pour le profil simulé") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE)
+```
+
+# 9. Sauvegarde des modèles pour l'application Shiny
+
+```{r save-models}
+saveRDS(results,          "/Users/edenbete/Desktop/app_BCA/models/rf_models.rds")
+saveRDS(X,                "/Users/edenbete/Desktop/app_BCA/models/X_train.rds")
+saveRDS(Y_filtered,       "/Users/edenbete/Desktop/app_BCA/models/Y_train.rds")
+saveRDS(subtypes,         "/Users/edenbete/Desktop/app_BCA/models/subtypes.rds")
+saveRDS(perf_df,          "/Users/edenbete/Desktop/app_BCA/models/perf_df.rds")
+
+cat("✓ Modèles sauvegardés dans app_BCA/models/\n")
+```
