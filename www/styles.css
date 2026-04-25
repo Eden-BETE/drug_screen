@@ -50,12 +50,14 @@ body {
   border-bottom: 1px solid #eee;
   font-weight: 600;
   letter-spacing: 0.5px;
+  color: #2C3E50 !important;
 }
 
 /* ── Boutons ──────────────────────────────────────────────────────────────── */
 .btn-primary {
   background-color: #2C3E50 !important;
   border-color: #2C3E50 !important;
+  color: #ffffff !important;
 }
 
 .btn-primary:hover {
@@ -101,6 +103,63 @@ body {
   font-style: italic;
   text-align: center;
   margin-bottom: 15px;
+}
+
+/* ── Intro Tab 1 ──────────────────────────────────────────────────────────── */
+.intro-accroche {
+  background: linear-gradient(135deg, #2C3E50 0%, #3d566e 100%);
+  color: #fff;
+  border-radius: 10px;
+  padding: 18px 24px;
+  margin-bottom: 18px;
+  font-size: 15px;
+  line-height: 1.7;
+}
+
+.intro-accroche strong {
+  color: #E07B00;
+}
+
+.intro-subtypes {
+  text-align: center;
+  padding: 12px 0 6px 0;
+}
+
+.intro-subtypes .subtype-label {
+  display: inline-block;
+  padding: 6px 16px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 700;
+  color: white;
+  margin: 4px;
+  letter-spacing: 0.5px;
+}
+
+.intro-card {
+  background: #f8f9fa;
+  border-radius: 10px;
+  border-top: 4px solid #E07B00;
+  padding: 18px 20px;
+  text-align: center;
+  height: 100%;
+}
+
+.intro-card .intro-card-icon {
+  font-size: 28px;
+  margin-bottom: 8px;
+}
+
+.intro-card h4 {
+  color: #2C3E50;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.intro-card p {
+  color: #555;
+  font-size: 13.5px;
+  margin: 0;
 }
 
 /* ── Table drogues ────────────────────────────────────────────────────────── */
