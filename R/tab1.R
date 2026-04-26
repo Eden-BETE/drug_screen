@@ -242,19 +242,6 @@ tab1_ui <- function() {
                heatmap d'expression ou d'influence par sous-type."
           )
       )
-    ),
-
-    # ── Section Belkis : Médicaments par sous-type ───────────────────────────
-    fluidRow(
-      box(width = 12, status = "success", solidHeader = TRUE,
-          title = "💊 Médicaments efficaces par sous-type — Belkis",
-          div(class = "placeholder-section",
-              icon("edit"), " Section à compléter par Belkis",
-              br(),
-              "Distribution des AUC par sous-type, tests de Kruskal-Wallis,
-               correction FDR, top drogues différentielles."
-          )
-      )
     )
   )
 }

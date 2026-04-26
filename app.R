@@ -4,14 +4,20 @@ library(tidyverse)
 library(randomForest)
 library(ggplot2)
 library(DT)
+library(plotly)
+library(rstatix)
 
 # Charger les variables d'environnement (GROQ_API_KEY, etc.)
 if (file.exists(".Renviron")) readRenviron(".Renviron")
+
+# Sources de données
+source("R/data_prep.R")
 
 # ── Sources modulaires ────────────────────────────────────────────────────────
 source("R/tab1.R")
 source("R/tab2_prediction.R")
 source("R/tab2_llm.R")
+source("R/tab3_eda.R")
 
 # ── Chargement des modèles ────────────────────────────────────────────────────
 # Générer ces fichiers en knittant ML_BCA_prediction.Rmd d'abord
@@ -33,6 +39,8 @@ ui <- dashboardPage(
     sidebarMenu(
       menuItem("Exploration & Données", tabName = "tab_explore",
                icon = icon("chart-bar")),
+      menuItem("Analyse molécule-cluster", tabName = "tab_eda",
+               icon = icon("pills")),
       menuItem("Prédiction ML + LLM",  tabName = "tab_pred",
                icon = icon("brain"))
     )
@@ -45,6 +53,8 @@ ui <- dashboardPage(
     tabItems(
       # Tab 1 — Exploration
       tab1_ui(),
+      # Tab 2 - Médicaments-cluster
+      tab3_eda_ui(),
 
       # Tab 2 — Prédiction ML + LLM dans le même onglet
       tabItem(tabName = "tab_pred",
@@ -63,6 +73,8 @@ server <- function(input, output, session) {
 
   # Tab 1
   tab1_server(input, output, session)
+  # Tab 2
+  tab3_eda_server(input, output, session)
 
   # Prédiction ML — retourne pred_results + detected_subtype pour le LLM
   pred_out <- tab2_prediction_server(input, output, session,
