@@ -11,7 +11,7 @@ library(stringr)
 
 # ── Constantes globales ───────────────────────────────────────────────────────
 
-DEFAULT_AUC_THRESHOLD <- 0.3  # Default value, but will be configurable in UI
+DEFAULT_AUC_THRESHOLD <- 0.3  # Valeur pas défaut, configurable dans UI
 MIN_CELLS     <- 2
 
 CLUSTER_COLORS <- c(

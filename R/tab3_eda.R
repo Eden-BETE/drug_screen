@@ -11,7 +11,21 @@ compute_responsive <- function(data, threshold) {
 tab3_eda_ui <- function() {
   tabItem(tabName = "tab_eda",
           
-          # ── AUC Threshold Slider ───────────────────────────────────────────────
+          
+          fluidRow(
+            column(12,
+                div(
+              style = "background:#1a1a2e; border-left: 4px solid #2A9D8F;
+               padding: 10px 15px; margin-bottom: 15px; border-radius: 4px;
+               color: #ccc; font-size: 13px;",
+              tags$b(" Remarque : "),
+            "Les calculs ne sont faits que sur les lignées testées pour chaque médicament.
+            Les données manquantes ne sont pas affichées (absence de test)."
+    )
+  )
+),
+          # ── AUC Slider ───────────────────────────────────────────────
+
           fluidRow(
             box(width = 12, status = "success", solidHeader = TRUE,
                 title = "Paramètres d'analyse",
@@ -32,7 +46,7 @@ tab3_eda_ui <- function() {
             )
           ),
           
-          # ── Statistiques par cluster (sous l'histogramme) ────────────────────────
+          # ── Statistiques par cluster  ────────────────────────
           fluidRow(
             box(width = 12, status = "success", solidHeader = TRUE,
                 title = "Statistiques par cluster",
@@ -48,15 +62,11 @@ tab3_eda_ui <- function() {
             )
           ),
           
-          # ── 3. Lignées & tests par cluster ───────────────────────────────────────
+          # ── 3. tests par cluster ───────────────────────────────────────
           fluidRow(
-            box(width = 6, status = "success", solidHeader = TRUE,
-                title = "Lignées cellulaires par cluster",
-                plotlyOutput("eda_bar_celllines", height = "300px")
-            ),
-            box(width = 6, status = "success", solidHeader = TRUE,
+            box(width = 12, status = "success", solidHeader = TRUE,
                 title = "Tests effectués par cluster",
-                plotlyOutput("eda_bar_tests", height = "300px")
+                plotlyOutput("eda_bar_tests", height = "380px")
             )
           ),
           
@@ -233,17 +243,6 @@ tab3_eda_server <- function(input, output, session) {
   })
   
   # ── Barplots lignées & tests ───────────────────────────────────────────────
-  output$eda_bar_celllines <- renderPlotly({
-    summ <- cluster_summary()
-    plot_ly(summ, x = ~cluster, y = ~n_cell_lines, type = "bar",
-            marker = list(color = unname(CLUSTER_COLORS[summ$cluster]),
-                          line  = list(color = "white", width = 1)),
-            text = ~n_cell_lines, textposition = "outside") %>%
-      layout(xaxis = list(title = "Cluster"),
-             yaxis = list(title = "Nb lignées",
-                          range = c(0, max(summ$n_cell_lines) * 1.2)),
-             showlegend = FALSE)
-  })
   
   output$eda_bar_tests <- renderPlotly({
     summ <- cluster_summary()
