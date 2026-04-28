@@ -15,6 +15,7 @@ source("R/data_prep.R")
 
 # ── Sources modulaires ────────────────────────────────────────────────────────
 source("R/tab1.R")
+source("R/tab_classes.R")
 source("R/tab2_prediction.R")
 source("R/tab2_llm.R")
 source("R/tab3_eda.R")
@@ -39,6 +40,8 @@ ui <- dashboardPage(
     sidebarMenu(
       menuItem("Exploration & Données", tabName = "tab_explore",
                icon = icon("chart-bar")),
+      menuItem("Visualisation des classes", tabName = "tab_classes",
+               icon = icon("microscope")),
       menuItem("Analyse molécule-cluster", tabName = "tab_eda",
                icon = icon("pills")),
       menuItem("Prédiction ML + LLM",  tabName = "tab_pred",
@@ -53,10 +56,12 @@ ui <- dashboardPage(
     tabItems(
       # Tab 1 — Exploration
       tab1_ui(),
-      # Tab 2 - Médicaments-cluster
+      # Tab 2 — Visualisation des classes (Ania)
+      tab_classes_ui(),
+      # Tab 3 — Médicaments-cluster
       tab3_eda_ui(),
 
-      # Tab 2 — Prédiction ML + LLM dans le même onglet
+      # Tab 4 — Prédiction ML + LLM dans le même onglet
       tabItem(tabName = "tab_pred",
         tab2_prediction_ui(X_train, subtypes),  # R/tab2_prediction.R
         hr(),
@@ -73,7 +78,9 @@ server <- function(input, output, session) {
 
   # Tab 1
   tab1_server(input, output, session)
-  # Tab 2
+  # Tab 2 — Visualisation des classes (Ania)
+  tab_classes_server(input, output, session)
+  # Tab 3
   tab3_eda_server(input, output, session)
 
   # Prédiction ML — retourne pred_results + detected_subtype pour le LLM
