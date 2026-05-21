@@ -119,27 +119,6 @@ tab1_ui <- function() {
                   )
                 ),
                 div(class = "source-badge", "AUC : aire sous courbe de viabilité")
-              ),
-
-              div(class = "source-connector",
-                div(class = "connector-line"),
-                tags$span(class = "connector-arrow", HTML("&#8681;"))
-              ),
-
-              div(class = "source-card card-depmap",
-                div(class = "source-header",
-                  span(class = "source-dot dot-depmap"), "DepMap — Broad Institute"
-                ),
-                div(class = "source-files",
-                  div(class = "file-entry",
-                    span(class = "file-icon", "📄"),
-                    div(
-                      div(class = "file-name", "Expression_Public_25Q3.csv"),
-                      div(class = "file-dim", "~1 400 lignées × 19 000+ gènes")
-                    )
-                  )
-                ),
-                div(class = "source-badge", "RNA-seq normalisé (TPM log2)")
               )
             ),
 
@@ -229,21 +208,8 @@ tab1_ui <- function() {
 
           ) # end data-schema
       )
-    ),
-
-    # ── Section Ania : Visualisation des classes ─────────────────────────────
-    fluidRow(
-      box(width = 12, status = "warning", solidHeader = TRUE,
-          title = "🔬 Visualisation des classes de lignées — Ania",
-          div(class = "placeholder-section",
-              icon("edit"), " Section à compléter par Ania",
-              br(),
-              "PCA sur les scores TF colorée par sous-type,
-               heatmap d'expression ou d'influence par sous-type."
-          )
-      )
     )
-  )
+  ) # end tabItem
 }
 
 tab1_server <- function(input, output, session) {

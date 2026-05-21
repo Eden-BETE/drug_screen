@@ -7,12 +7,13 @@ library(stringr)
 predict_best_drugs <- function(tf_scores_new, models, top_n = 10) {
   tf_df <- as.data.frame(t(tf_scores_new))
 
-  preds <- sapply(models, function(res) {
+  preds <- sapply(names(models), function(d) {
+    res        <- models[[d]]
     m          <- res$model
     tfs_needed <- rownames(m$importance)
     tfs_ok     <- intersect(tfs_needed, colnames(tf_df))
     if (length(tfs_ok) < 10) return(NA)
-    predict(m, tf_df[, tfs_ok, drop = FALSE])
+    as.numeric(predict(m, tf_df[, tfs_ok, drop = FALSE]))
   })
 
   preds  <- preds[!is.na(preds)]
@@ -108,11 +109,7 @@ tab2_prediction_ui <- function(X_train, subtypes) {
             div(class = "info-row",
               div(class = "auc-chip", style = "background:#E74C3C;", "AUC > 0.5"),
               span("Faible sensibilité")
-            ),
-            hr(style = "margin:10px 0;"),
-            p(style = "color:#888; font-size:11.5px; margin:0;",
-              icon("book-open"),
-              " Corsello et al., ", tags$em("Nature Cancer"), ", 2020")
+            )
           )
       )
     ),
@@ -130,11 +127,8 @@ tab2_prediction_ui <- function(X_train, subtypes) {
 
     # ── Ligne 3 : Graphes ─────────────────────────────────────────────────
     fluidRow(
-      box(width = 6, status = "primary", solidHeader = TRUE,
-          title = tags$span(icon("chart-bar"), " AUC prédits par médicament"),
-          plotOutput("auc_plot", height = "360px")
-      ),
-      box(width = 6, status = "info", solidHeader = TRUE,
+
+      box(width = 12, status = "info", solidHeader = TRUE,
           title = tags$span(icon("brain"), " Top facteurs de transcription prédictifs"),
           plotOutput("tf_importance_plot", height = "360px")
       )
@@ -156,9 +150,9 @@ tab2_prediction_server <- function(input, output, session,
         vec
       } else {
         req(input$tf_file)
-        df  <- read.csv(input$tf_file$datapath, row.names = 1, header = TRUE)
-        vec <- df[, 1]
-        names(vec) <- rownames(df)
+        df  <- read.csv(input$tf_file$datapath, header = FALSE, sep = ";")
+        vec <- as.numeric(df[, 2])
+        names(vec) <- df[, 1]
         vec
       }
     })
@@ -305,13 +299,13 @@ tab2_prediction_server <- function(input, output, session,
 
     # Extraire l'importance : essayer $model$importance (matrice) puis $importance (vecteur)
     get_imp <- function(m) {
-      if (!is.null(m$model) && !is.null(m$model$importance)) {
-        mat <- m$model$importance
-        data.frame(TF = rownames(mat), Imp = mat[, "%IncMSE"],
-                   stringsAsFactors = FALSE)
-      } else if (!is.null(m$importance) && length(m$importance) > 0) {
+      if (!is.null(m$importance) && length(m$importance) > 0) {
         imp <- m$importance
         data.frame(TF = names(imp), Imp = as.numeric(imp),
+                   stringsAsFactors = FALSE)
+      } else if (!is.null(m$model) && !is.null(m$model$importance)) {
+        mat <- importance(m$model)
+        data.frame(TF = rownames(mat), Imp = mat[, "%IncMSE"],
                    stringsAsFactors = FALSE)
       } else NULL
     }
@@ -328,7 +322,6 @@ tab2_prediction_server <- function(input, output, session,
     imp_summary <- imp_df %>%
       group_by(TF) %>%
       summarise(Importance = mean(Imp, na.rm = TRUE), .groups = "drop") %>%
-      filter(Importance > 0) %>%
       arrange(desc(Importance)) %>%
       head(15)
 
@@ -337,8 +330,6 @@ tab2_prediction_server <- function(input, output, session,
 
     ggplot(imp_summary, aes(x = reorder(TF, Importance), y = Importance)) +
       geom_col(fill = "#2C3E50", width = 0.65) +
-      geom_text(aes(label = round(Importance, 1)),
-                hjust = -0.2, size = 3, color = "#555") +
       coord_flip(clip = "off") +
       scale_y_continuous(expand = expansion(mult = c(0, 0.2))) +
       labs(x = NULL, y = "Importance (%IncMSE)", subtitle = subtitle_txt) +
