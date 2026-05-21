@@ -63,7 +63,7 @@ tab2_llm_ui <- function() {
   tagList(
     fluidRow(
       box(width = 4, status = "success", solidHeader = TRUE,
-          title = "Hypothèses biologiques — Gemini Flash",
+          title = "Hypothèses biologiques — Groq",
 
           p(style = "color:#555; font-size:13px;",
             "Le modèle analyse les médicaments prédits et le sous-type détecté",
@@ -103,7 +103,7 @@ tab2_llm_server <- function(input, output, session,
                              pred_results, detected_subtype) {
 
   llm_text <- eventReactive(input$run_llm, {
-    withProgress(message = "Interrogation de Gemini Flash...", value = 0.5, {
+    withProgress(message = "Interrogation de Groq...", value = 0.5, {
       call_llm(pred_results(), detected_subtype())
     })
   })
